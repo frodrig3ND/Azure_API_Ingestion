@@ -1,5 +1,5 @@
 # 3rd Party Data Ingestion using Azure Offerings
-Recently I have been dealing with moving a lot of my automatic data ingestion/ reporting pipelines from local hardware to Azure solutions. This prompted me to take a deep dive into their solutions to perform a simple task query an API with oauth2.0 authorization and push that data into Azure Blobs or a hosted SQLDB. In this case pulling my activity information from the previously discussed [Strava API](strava.com)
+Recently I have been dealing with moving a lot of my automatic data ingestion/ reporting pipelines from local hardware to Azure solutions. This prompted me to take a deep dive into their solutions to perform a simple task query an API with oauth2.0 authorization and push that data into Azure Blobs or a hosted SQLDB. In this case pulling my activity information from the previously discussed [Strava API](https://rodriguezanton.com/building-a-fitness-tracking-dashboard-with-python-pt-1-strava-and-fitbit-api-interface/)
 
 Azures offerings are kind of all over the place and there is significant overlap between solutions. For this specific task I identified 4 different ways to perform that given task, with some pros and cons.
 
@@ -14,27 +14,22 @@ In terms of coding ability these go somewhat in ascending order, with Azure Data
 Azure actually has quite a few options for debugging locally. Mostly relevant for the Azure Functions and Container Instances. All of them can be downloaded from the Azure website. For this project I used both the Azure Storage Emulator and the Azure SQL Emulator.
 
 ## Azure Data Factory
-In order to setup this solution I mostly followed the instructions outlined in this [blog](blogpost.com). Basically we setup an _http request_ using a _refresh token_ previously obtained using postman to obtain an _authorization token_. We can further secure this by using blob storage to store the _refresh token_ instead of using plain text on the connector.
-
-![alt text](Isolated.png "Title")
+In order to setup this solution I mostly followed the instructions outlined in this [excellent post](https://www.alexvolok.com/2019/adfv2-rest-api-part1-oauth2/). Basically we setup an _http request_ using a _refresh token_ previously obtained using postman to obtain an _authorization token_. We can further secure this by using blob storage to store the _refresh token_ instead of using plain text on the connector.
 
 Once we have obtained the _authorization token_ we can make a call with the correct headers to the API endpoint to obtain the data (in my case activities). We can pass the resulting values in the JSON array into a blob storage. I also chose to setup a separate pipeline to then push the blobs into SQL Server. This is to keep some parallelism (obviously this is overkill for my Strava data).
 
-![alt text](Isolated.png "Title")
-
-I also set up a branch from the authorization http call to remind me when the _refresh token_ has expired and needs to be refreshed. The re-authorization workflow can't be kicked off directly from there so I would have to generate a new refresh token from postman.
-
-The one downside that at least for the version I have available on Azure I do not have the capability of using private endpoints. This means that I would either have to setup private(ish) facing blob storage/ SQL database. There is a solution for using a (Azure Data Factory Managed Virtual Network)[https://docs.microsoft.com/en-us/azure/data-factory/managed-virtual-network-private-endpoint] but its in preview and I don't have access.
+The one downside that at least for the version I have available on Azure I do not have the capability of using private endpoints. This means that I would either have to setup private(ish) facing blob storage/ SQL database. There is a solution for using a [Azure Data Factory Managed Virtual Network](https://docs.microsoft.com/en-us/azure/data-factory/managed-virtual-network-private-endpoint) but its in preview and I don't have access.
 
 ## Logic App
 Logic App is basically the developer version of __Power Automate/ Flow__. This means we can both work on the designer or use a code editor. In order to deal with the API for Strava we create a custom logic connector. To do so we go to _Logic App Connector_.
-![alt text](LA1.png "Logic custom connector")
+![alt text](Logic_App/Custom_Connector.png "Logic custom connector")
 
 Once we create the connector we can setup our _Logic App_. We are going to set it up with a timer function to fire of once a day to pull our activities. Form there we fire off our custom connector. Finally we process the JSON data into a blob, or if we want directly into the SQL connector. The main problem is that at least in the version I have access to, we need to set it up so its a public facing SQL, and cannot use the private endpoints.
+![alt text](Logic_App/Flow1.png "Logic Setup")
 
 ## Azure Functions
-To setup the Azure Function App I based myself on the tutorial posted in this [blog](BLOG.com).
-Switiching over to VS Code as recommended (and for the Azure Integration).
+To setup the Azure Function App I based myself on the tutorial posted in this [blog](https://trallard.github.io/pycon2020-azure-functions/).
+Switching over to VS Code as recommended (and for the Azure Integration).
 
 The ingestion system is going to consist of two different functions.
 
@@ -76,7 +71,7 @@ Azure_API_Ingestion
 We start the project by selecting the 'Create Function' in the Azure Function plugin window.
 This will generate the project structure
 
-![alt text](LA1.png "Azure Function App Generation")
+![alt text](VSCode_create_func.png "Azure Function App Generation")
 
 I first created the `timer-trigger` function, this will handle the downloading. I renamed the initial __\_\_init\_\_.py__ to __strava_download.py__ for clarity. Because of that the __function.json__ file under `timer_trigger` had to be modified. This file defines all the bindings (in and out) for a specific function, in the timer case it contains the CRON expression for it the name, and the type of the trigger (which we will use in __strava_download.py__).
 
@@ -121,7 +116,7 @@ USR= '***'
 PWD= '***'
 ```
 
-Then we call `find_dotenv` and `load_dotenv` as shown in the [Azure Functions tutorial](url???.com).
+Then we call `find_dotenv` and `load_dotenv` as shown in the [Azure Functions tutorial](https://trallard.github.io/pycon2020-azure-functions/).
 
 Now we set our Strava Credentials as follows
 
@@ -130,9 +125,9 @@ client_id=os.environ.get("CLIENT_ID")
 client_secret=os.environ.get("CLIENT_SECRET")
 refresh_token=os.environ.get("REFRESH_TOKEN")
 ```
-For Strava I will just use the refresh token to obtain a new access token\\check if it hasn't expired. This could obviously be changed. In fact Azure does contain ways to do so using the [Azure Key Vault](url???).
+For Strava I will just use the refresh token to obtain a new access token\\check if it hasn't expired. This could obviously be changed. In fact Azure does contain ways to do so using the [Azure Key Vault](https://www.alexvolok.com/2019/adfv2-rest-api-part3-securing-keyvault/).
 
-Once we make the API call to get the activities (code can be found [here](url???)). We will pass the results of the call to a storage blob to be further processed (we could also generate one individual blob per record if we wanted to, which would be perhaps a better option).
+Once we make the API call to get the activities. We will pass the results of the call to a storage blob to be further processed (we could also generate one individual blob per record if we wanted to, which would be perhaps a better option).
 
 This is done using the __util\\.blob.py__ functions. There is a why to use the output bindings in the Azure Function, however at the current moment there is no way to set the file type of the blob using that method.
 
@@ -264,7 +259,7 @@ CMD ["python","strava_downloader.py"]
 ```
 Then the docker compose file (which we can fire off from VSCode with the plugin).
 
-```docker-compose
+```dockercompose
 version: '3.6'
 
 services:
@@ -395,8 +390,6 @@ if __name__ == "__main__":
                 wid=act.get('id'))
                 session.merge(sact)
                 session.commit()
-
-
 ```
 
 The main advantage is that this way I can run the container inside our virtual network and have it access the private SQL endpoint. In this way there really isn't any part of the pipeline that is public facing. The code for this setup is [here](github).
