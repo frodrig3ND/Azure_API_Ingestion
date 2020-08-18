@@ -1,0 +1,11 @@
+version: '3.6'
+
+services:
+  downloader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - default
+    ports:
+      - 5000:5000
