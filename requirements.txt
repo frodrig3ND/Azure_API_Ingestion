@@ -1,0 +1,7 @@
+azure-functions
+azure.core
+azure.storage.blob
+requests==2.24.0
+python-dotenv==0.13.0
+pyodbc
+sqlalchemy
